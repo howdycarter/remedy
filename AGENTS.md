@@ -31,3 +31,60 @@ Use `adding-a-feature` for functional parity and `frontend-design` for a user-fa
 Before building common workspace or agent UI, read `agent-native-toolkit`; for supported customization, read `customizing-agent-native`.
 
 - Guarded verification: run `pnpm agent-native:doctor`; fix findings before done.
+
+
+---
+
+# Remedy — Accessibility Remediation Studio
+
+Remedy is the domain app built on this Chat template for the Builder.io
+Agent-Native Hackathon (deadline Nov 9, 2026, 11:59 PM PT). The studio
+lives at `/remedy` (`app/routes/remedy.tsx`); `app.homePath` points
+there. Disclosure for the submission description: the app is built on
+the Agent-Native **chat template** (pre-existing framework code by
+Builder.io); everything under `server/a11y/`, the seven actions below,
+the seeded sample pages, and the `/remedy` studio UI are new work for
+this hackathon.
+
+## The workflow
+
+One job, end to end: **ingest → audit → prioritize → approve → export.**
+
+| Action | What it does |
+|---|---|
+| `list-samples` | List the 3 seeded broken sample pages (café, checkout, article). The demo path — never depend on a live fetch. |
+| `get-sample` | Return one sample's HTML by id. |
+| `ingest-page` | Accept pasted HTML or fetch a public URL. Bonus path only. |
+| `run-audit` | Deterministic WCAG rule engine over static HTML (`server/a11y/engine.ts`). Findings carry WCAG criterion, severity, the offending element, and a drafted fix. No model calls. |
+| `prioritize-findings` | The same findings as a deterministic work order with plain-language rationale (severity → level → blocks interaction). |
+| `apply-fix` | Splice ONE approved fix into the document at its recorded span; verifies `expectedBefore` and fails rather than splicing a stale location. |
+| `export-report` | ACR/VPAT-style Markdown report: before/after scores, criteria table, resolved findings with before/after, remaining findings. Not a certification. |
+
+## Agent conduct rules (the product's core promise)
+
+- **Never call `apply-fix` without the user's approval of that specific
+  diff.** Show the before/after in chat first and get an explicit yes —
+  in chat, the same as the UI's Approve button. If the drafted wording
+  is a placeholder (`needsHumanWording`), say so and ask the user for
+  the real wording before applying.
+- The engine is deterministic on purpose: never invent findings the
+  audit did not return, never soften a severity, and never describe a
+  clean run as "WCAG compliant" or "certified". Approved language:
+  "no findings against the 12 criteria Remedy evaluates" — the scope
+  footer in the UI and the report's About section carry the full
+  limitation statement.
+- After every `apply-fix`, re-run `run-audit` on the new HTML before
+  reporting state — spans from the old audit are stale.
+- Prefer the seeded samples for demonstrations. If a live fetch fails,
+  say so and fall back to a sample; do not retry blindly.
+
+## Engine notes
+
+- Rules: html-lang, document-title, img-alt (+filename variant),
+  input-label, button-name, link-name, heading-order, empty-heading,
+  duplicate-id, positive-tabindex, contrast-insufficient (only where
+  colors are declared in the document), table-headers, frame-title,
+  viewport-zoom — 12 WCAG 2.1 criteria.
+- `scripts/verify-flow.ts` runs the whole flow headlessly against all
+  three samples and asserts the GO/NO-GO bar; run it after any engine
+  or action change.
