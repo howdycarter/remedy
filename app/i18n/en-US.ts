@@ -56,7 +56,7 @@ const messages = {
     docsGettingStarted: "Getting started",
     docsKeyConcepts: "Key concepts",
     docsTitle: "Documentation",
-    title: "Get started",
+    title: "Remedy",
   },
   navigation: {
     chat: "Chat",

@@ -18,7 +18,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { useState, type ReactNode } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -212,8 +212,20 @@ export default function HomePage() {
           className="h-8 w-14 text-foreground"
         />
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-          {t("home.title")}
+          Remedy
         </h1>
+        <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
+          Accessibility Remediation Studio — audit static HTML against 12 WCAG
+          2.1 criteria, approve drafted fixes, and export an ACR-style report.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Button asChild size="lg">
+            <Link to="/remedy">Open Remedy studio</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link to="/chat">Ask the agent</Link>
+          </Button>
+        </div>
         <HomeAgentComposer />
       </section>
 
