@@ -4,6 +4,10 @@ Paste a page (or load a seeded sample) → run a deterministic WCAG rule engine 
 
 Built on Builder.io's open-source **Agent-Native** framework (`defineAction()` from `@agent-native/core`) for the [Agent-Native Hackathon](https://www.builder.io/hackathon).
 
+## Try it
+
+Hosted demo: **https://remedy-sigma.vercel.app** — create an account, then open **Remedy studio** and load a sample. Fetching a URL is switched off on the hosted demo; paste HTML or use the samples. To run every feature, clone the repo and follow **Develop** below.
+
 ## Demo path (no live fetch required)
 
 1. Open `/remedy` (sidebar: **Remedy studio**).
