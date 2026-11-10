@@ -39,6 +39,28 @@ export default defineAction({
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return fail("Only http and https URLs can be fetched.", { errorCode: "invalid_url" });
     }
+    // A public demo can switch server-side fetching off entirely.
+    if (process.env.REMEDY_DISABLE_URL_FETCH === "true") {
+      return fail("Fetching a URL is switched off on this public demo. Paste the page's HTML source instead, or use a sample.", {
+        errorCode: "url_fetch_disabled",
+        statusCode: 403,
+      });
+    }
+    // Never fetch loopback, link-local or private-network addresses on the server's behalf.
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const privateHost =
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host.endsWith(".internal") ||
+      host.endsWith(".local") ||
+      host === "::1" ||
+      host.startsWith("fc") ||
+      host.startsWith("fd") ||
+      host.startsWith("fe80:") ||
+      /^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    if (privateHost) {
+      return fail("Only public web addresses can be fetched.", { errorCode: "invalid_url" });
+    }
     let res: Response;
     try {
       res = await fetch(parsed.toString(), {
