@@ -39,7 +39,7 @@ curl -s -X POST $APP/_agent-native/actions/run-audit \
 
 The Juniper Café sample returns `score: 14, total: 10` from the studio, the CLI and HTTP alike. The same seven actions are exposed as MCP tools at `$APP/mcp` (needs an access token: `pnpm exec agent-native mcp token`).
 
-The approval check lives in the action, not the button: `apply-fix` verifies `expectedBefore` and refuses a fix drafted against a different document, whoever calls it.
+The stale-document check lives in the action, not the button: `apply-fix` verifies `expectedBefore` and refuses a fix drafted against a different document, whoever calls it. Approval itself is given by a person: the Approve button in the studio, or an explicit yes in chat, which the agent is instructed to ask for before every apply.
 
 ## What is new vs the chat template
 
