@@ -18,6 +18,29 @@ Headless GO/NO-GO check (audit → prioritize → apply → re-audit → report)
 pnpm verify
 ```
 
+## Same action, any caller
+
+Each capability is one `defineAction`. The studio UI, the in-app agent, the CLI, HTTP and MCP clients all call the same code.
+
+From a terminal — no browser, no model call, no API keys:
+
+```bash
+pnpm action list-samples
+pnpm action run-audit --html "$(cat page.html)"   # score + findings
+```
+
+Over HTTP, with `pnpm dev` running (`$APP` is the URL it prints; local dev with `AUTH_DISABLED=true` in `.env`):
+
+```bash
+curl -s -X POST $APP/_agent-native/actions/run-audit \
+  -H 'content-type: application/json' \
+  -d '{"html":"<html><body><img src=\"a.png\"></body></html>"}'
+```
+
+The Juniper Café sample returns `score: 14, total: 10` from the studio, the CLI and HTTP alike. The same seven actions are exposed as MCP tools at `$APP/mcp` (needs an access token: `pnpm exec agent-native mcp token`).
+
+The approval check lives in the action, not the button: `apply-fix` verifies `expectedBefore` and refuses a fix drafted against a different document, whoever calls it.
+
 ## What is new vs the chat template
 
 This app starts from the Agent-Native **chat** template. New hackathon work:
