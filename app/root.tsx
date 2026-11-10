@@ -60,8 +60,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content"
+          content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
         />
+        {/* The public demo runs with sign-in off on purpose; hide the framework's operator notice about it there only. */}
+        {import.meta.env.VITE_REMEDY_PUBLIC_DEMO === "true" ? (
+          <style>{`aside[data-testid="runtime-config-notice"]{display:none !important}`}</style>
+        ) : null}
         <script
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
