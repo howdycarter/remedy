@@ -6,7 +6,7 @@ Built on Builder.io's open-source **Agent-Native** framework (`defineAction()` f
 
 ## Try it
 
-Hosted demo: **https://remedy-sigma.vercel.app** — create an account, then open **Remedy studio** and load a sample. Fetching a URL is switched off on the hosted demo; paste HTML or use the samples. To run every feature, clone the repo and follow **Develop** below.
+Hosted demo: **https://remedy-sigma.vercel.app** — no account needed; it opens in the studio, so load a sample and start approving. The demo runs with sign-in switched off, so every visitor shares one workspace: don't save anything private there. Fetching a URL is switched off on the hosted demo; paste HTML or use the samples. To run every feature, clone the repo and follow **Develop** below.
 
 ## Demo path (no live fetch required)
 
