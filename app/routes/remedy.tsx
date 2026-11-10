@@ -1,5 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { useActionQuery, callAction } from "@agent-native/core/client/hooks";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useActionQuery,
+  callAction,
+  readClientAppState,
+  writeClientAppState,
+} from "@agent-native/core/client/hooks";
+import { TAB_ID } from "@/lib/tab-id";
 
 export function meta() {
   return [
@@ -435,6 +441,82 @@ export default function RemedyRoute() {
   const resolvedEstimate =
     initialTotal !== null && audit ? Math.max(0, initialTotal - audit.total) : 0;
 
+  // ---- Shared state: the agent sees the page that is open here, and its approved fixes land here.
+  const docRev = useRef(0);
+  useEffect(() => {
+    if (!originalHtml || !currentHtml) return;
+    const rev = Date.now();
+    docRev.current = rev;
+    void writeClientAppState(
+      "remedy-document",
+      { pageLabel, originalHtml, currentHtml, rev, source: TAB_ID },
+      { requestSource: TAB_ID },
+    ).catch(() => {});
+  }, [pageLabel, originalHtml, currentHtml]);
+
+  useEffect(() => {
+    if (!audit || !currentHtml) return;
+    void writeClientAppState(
+      "remedy-studio",
+      {
+        page: pageLabel,
+        score: audit.score,
+        openFindings: audit.total,
+        resolved: resolvedEstimate,
+        reportGenerated: report !== null,
+        findings: sortedFindings.slice(0, 12).map((f) => ({
+          fixOrder: priorityMap[f.id]?.rank ?? null,
+          rule: f.ruleId,
+          title: f.title,
+          severity: f.severity,
+          wcag: f.wcag,
+          selector: f.selector,
+          needsHumanWording: f.fix?.needsHumanWording ?? false,
+          draftedFix: f.fix
+            ? { start: f.fix.start, end: f.fix.end, before: f.fix.before, after: edits[findingKey(f)] ?? f.fix.after }
+            : null,
+        })),
+        updatedAt: new Date().toISOString(),
+      },
+      { requestSource: TAB_ID },
+    ).catch(() => {});
+  }, [pageLabel, audit, currentHtml, report, sortedFindings, priorityMap, edits, resolvedEstimate]);
+
+  // Pick up a fix the agent applied to this page (apply-fix with updateStudio) and re-audit.
+  useEffect(() => {
+    if (!currentHtml) return;
+    const timer = setInterval(async () => {
+      if (busy !== null) return;
+      const doc = await readClientAppState<{
+        currentHtml?: string;
+        rev?: number;
+        source?: string;
+        lastFix?: { before: string; after: string };
+      }>("remedy-document").catch(() => null);
+      if (!doc?.currentHtml || doc.source !== "agent" || !doc.rev || doc.rev <= docRev.current) return;
+      if (doc.currentHtml === currentHtml) return;
+      docRev.current = doc.rev;
+      const fix = doc.lastFix;
+      const finding = fix ? audit?.findings.find((f) => f.fix?.before === fix.before) : undefined;
+      if (fix && finding?.fix) {
+        const drafted = finding.fix.after;
+        setApplied((prev) => [
+          ...prev,
+          { ruleId: finding.ruleId, selector: finding.selector, snippet: finding.snippet, before: fix.before, after: fix.after, draftedAfter: drafted },
+        ]);
+      }
+      setCurrentHtml(doc.currentHtml);
+      setReport(null);
+      try {
+        const result = await runAuditOn(doc.currentHtml);
+        setStatus(`The agent applied an approved fix. ${result.total} finding(s) remain, score ${result.score}/100.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [currentHtml, audit, busy]);
+
   const totalAtStart = initialTotal ?? audit?.total ?? 0;
   const progress = totalAtStart > 0 ? Math.round((resolvedEstimate / totalAtStart) * 100) : 0;
 
@@ -573,6 +655,11 @@ export default function RemedyRoute() {
                 >
                   <div className="h-full rounded-full bg-emerald-600 transition-[width] duration-700 ease-out" style={{ width: `${progress}%` }} />
                 </div>
+                {status ? (
+                  <p data-status className="mt-1.5 truncate text-xs text-muted-foreground">
+                    {status}
+                  </p>
+                ) : null}
               </div>
               <ul className="flex flex-wrap items-center gap-2" aria-label="Open findings by severity">
                 {(Object.keys(audit.counts) as Severity[]).map((sev) =>

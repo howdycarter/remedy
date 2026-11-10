@@ -58,6 +58,7 @@ One job, end to end: **ingest → audit → prioritize → approve → export.**
 | `run-audit` | Deterministic WCAG rule engine over static HTML (`server/a11y/engine.ts`). Findings carry WCAG criterion, severity, the offending element, and a drafted fix. No model calls. |
 | `prioritize-findings` | The same findings as a deterministic work order with plain-language rationale (severity → level → blocks interaction). |
 | `apply-fix` | Splice ONE approved fix into the document at its recorded span; verifies `expectedBefore` and fails rather than splicing a stale location. |
+| `get-studio-document` | Return the page the user has open in the studio (label, original HTML, current HTML). Use it so you work on their page, not a fresh copy. |
 | `export-report` | ACR/VPAT-style Markdown report: before/after scores, criteria table, resolved findings with before/after, remaining findings. Not a certification. |
 
 ## Agent conduct rules (the product's core promise)
@@ -73,6 +74,13 @@ One job, end to end: **ingest → audit → prioritize → approve → export.**
   "no findings against the 12 criteria Remedy evaluates" — the scope
   footer in the UI and the report's About section carry the full
   limitation statement.
+- `apply-fix` sets the framework's `needsApproval`: the agent loop pauses
+  for the user's approval, and a bare HTTP call is refused. Do not look
+  for a way around it.
+- When `view-screen` shows `remedyStudio`, the user has a page open in
+  the studio. Read it with `get-studio-document`, audit that HTML, and
+  pass `updateStudio: true` to `apply-fix` so the approved fix appears
+  on their screen. Never work on a fresh copy of a page they have open.
 - After every `apply-fix`, re-run `run-audit` on the new HTML before
   reporting state — spans from the old audit are stale.
 - When calling `export-report`, pass `appliedFixes` with each fix as it

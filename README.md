@@ -37,16 +37,32 @@ curl -s -X POST $APP/_agent-native/actions/run-audit \
   -d '{"html":"<html><body><img src=\"a.png\"></body></html>"}'
 ```
 
-The Juniper Café sample returns `score: 14, total: 10` from the studio, the CLI and HTTP alike. The same seven actions are exposed as MCP tools at `$APP/mcp` (needs an access token: `pnpm exec agent-native mcp token`).
+The Juniper Café sample returns `score: 14, total: 10` from the studio, the CLI and HTTP alike. The same actions are exposed as MCP tools at `$APP/mcp` (needs an access token: `pnpm exec agent-native mcp token`).
 
-The stale-document check lives in the action, not the button: `apply-fix` verifies `expectedBefore` and refuses a fix drafted against a different document, whoever calls it. Approval itself is given by a person: the Approve button in the studio, or an explicit yes in chat, which the agent is instructed to ask for before every apply.
+## The agent and the studio share the page
+
+The studio publishes the page you have open to application state, so the agent works on your page, not a copy:
+
+- `view-screen` tells the agent what is on screen: the page, its score, and the open findings with their drafted fixes.
+- `get-studio-document` returns that page's HTML.
+- `apply-fix` with `updateStudio: true` lands an approved fix in the open page; the studio re-audits and the score moves on your screen.
+
+`apply-fix` sets the framework's `needsApproval`. The agent loop pauses for your approval before it runs, a bare HTTP call is refused with `approval_required`, and the studio's Approve button is the same approval given in the app's own UI. It also verifies `expectedBefore` and refuses a fix drafted against a different document, whoever calls it.
+
+```bash
+export AGENT_USER_EMAIL=dev@local.test        # CLI calls that read studio state run as a user
+pnpm action view-screen                       # what the agent sees
+pnpm action apply-fix --html "$(cat page.html)" --start 16 --end 22 --after '<html lang="en">' --updateStudio true
+# -> requires human approval; rerun with --approved once a person has agreed
+```
 
 ## What is new vs the chat template
 
 This app starts from the Agent-Native **chat** template. New hackathon work:
 
 - `server/a11y/` — parser, contrast math, 12-criterion WCAG rule engine, seeded samples, report builder
-- Actions: `list-samples`, `get-sample`, `ingest-page`, `run-audit`, `prioritize-findings`, `apply-fix`, `export-report`
+- Actions: `list-samples`, `get-sample`, `ingest-page`, `run-audit`, `prioritize-findings`, `apply-fix`, `export-report`, `get-studio-document`
+- Shared state: the studio's open page is published to application state and read by `view-screen`, so the agent sees what the user sees
 - UI: `/remedy` studio (`app/routes/remedy.tsx`) + sidebar entry
 
 A clean audit is **not** a WCAG certification — findings are against the 12 criteria Remedy evaluates on static HTML only.
