@@ -42,7 +42,7 @@ Agent-Native Hackathon (deadline Nov 9, 2026, 11:59 PM PT). The studio
 lives at `/remedy` (`app/routes/remedy.tsx`); `app.homePath` points
 there. Disclosure for the submission description: the app is built on
 the Agent-Native **chat template** (pre-existing framework code by
-Builder.io); everything under `server/a11y/`, the seven actions below,
+Builder.io); everything under `server/a11y/`, the actions below,
 the seeded sample pages, and the `/remedy` studio UI are new work for
 this hackathon.
 

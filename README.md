@@ -8,15 +8,17 @@ Built on Builder.io's open-source **Agent-Native** framework (`defineAction()` f
 
 Hosted demo: **https://remedy-sigma.vercel.app** — no account needed; it opens in the studio, so load a sample and start approving. The demo runs with sign-in switched off, so every visitor shares one workspace: don't save anything private there. Fetching a URL is switched off on the hosted demo; paste HTML or use the samples. To run every feature, clone the repo and follow **Develop** below.
 
-## Demo path (no live fetch required)
+Demo video: **https://youtu.be/XHD_9z1XXL4** (2:35). What it shows, with the narration, is in [DEMO.md](DEMO.md).
+
+## Demo path
 
 1. Open `/remedy` (sidebar: **Remedy studio**).
-2. Load a seeded sample: **Juniper Café**, **Northwind checkout**, or **Community news**.
-3. Review prioritized findings (severity carries a drafted fix).
+2. Load a sample: **Juniper Café**, **Northwind checkout**, or **Community news**. You can also paste HTML or fetch a public URL.
+3. Review the findings in priority order; each comes with a drafted fix you can edit.
 4. Approve fixes one by one — each apply re-audits so spans stay fresh.
 5. Export corrected HTML + markdown remediation report.
 
-Headless GO/NO-GO check (audit → prioritize → apply → re-audit → report):
+Headless end-to-end check (audit → prioritize → apply → re-audit → report), no API keys:
 
 ```bash
 pnpm verify
@@ -81,6 +83,8 @@ pnpm dev      # full app (needs Agent-Native local runtime)
 ```
 
 Requires Node ≥ 22.22.
+
+The hosted demo is built with `VITE_REMEDY_PUBLIC_DEMO=true` and runs with `AUTH_DISABLED=true` and `REMEDY_DISABLE_URL_FETCH=true`. Do not use `AUTH_DISABLED` for a deployment with real users: every visitor shares one account.
 
 ## License / IP
 
