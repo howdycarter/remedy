@@ -7,7 +7,7 @@
  *
  * Run: pnpm exec tsx scripts/verify-flow.ts
  */
-import { auditHtml, prioritizeFindings, buildReport } from "../server/a11y/engine.js";
+import { auditHtml, prioritizeFindings, buildReport, type AppliedFix, type Finding } from "../server/a11y/engine.js";
 import { SAMPLES } from "../server/a11y/samples.js";
 
 let failures = 0;
@@ -16,10 +16,18 @@ function check(label: string, ok: boolean, detail = "") {
   if (!ok) failures++;
 }
 
-function applyAllFixes(html: string): { html: string; applied: number; stuck: string[] } {
+/**
+ * `review` stands in for the human: it receives the finding and its
+ * drafted "after" text and returns the wording to approve.
+ */
+function applyAllFixes(
+  html: string,
+  review: (f: Finding, drafted: string) => string = (_f, drafted) => drafted,
+): { html: string; applied: number; stuck: string[]; records: AppliedFix[] } {
   let current = html;
   let applied = 0;
   const stuck: string[] = [];
+  const records: AppliedFix[] = [];
   let noProgress = 0;
   for (let iter = 0; iter < 120; iter++) {
     const audit = auditHtml(current);
@@ -30,7 +38,8 @@ function applyAllFixes(html: string): { html: string; applied: number; stuck: st
       stuck.push(`${target.ruleId}: span mismatch (parser/span bug)`);
       break;
     }
-    const next = current.slice(0, target.fix.start) + target.fix.after + current.slice(target.fix.end);
+    const approved = review(target, target.fix.after);
+    const next = current.slice(0, target.fix.start) + approved + current.slice(target.fix.end);
     const nextTotal = auditHtml(next).total;
     if (nextTotal >= audit.total) {
       noProgress++;
@@ -43,8 +52,26 @@ function applyAllFixes(html: string): { html: string; applied: number; stuck: st
     }
     current = next;
     applied++;
+    records.push({
+      ruleId: target.ruleId,
+      selector: target.selector,
+      snippet: target.snippet,
+      before: target.fix.before,
+      after: approved,
+      draftedAfter: target.fix.after,
+    });
   }
-  return { html: current, applied, stuck };
+  return { html: current, applied, stuck, records };
+}
+
+/** Every "After" line in a report must quote text that is in the remediated HTML. */
+function reportAfterLinesNotInHtml(markdown: string, fixedHtml: string): string[] {
+  const haystack = fixedHtml.replace(/`/g, "'");
+  return markdown
+    .split("\n")
+    .filter((line) => line.startsWith("- **After") && !line.includes("later changed again"))
+    .map((line) => line.slice(line.indexOf("`") + 1, line.lastIndexOf("`")))
+    .filter((quoted) => !haystack.includes(quoted));
 }
 
 const EXPECTED_RULES: Record<string, string[]> = {
@@ -80,12 +107,19 @@ for (const sample of SAMPLES) {
     );
   }
 
-  const { html: fixed, applied, stuck } = applyAllFixes(sample.html);
+  const { html: fixed, applied, stuck, records } = applyAllFixes(sample.html);
   const after = auditHtml(fixed);
   console.log(`  applied ${applied} fixes → score=${after.score} remaining=${after.total}`);
   check("no stuck fixes", stuck.length === 0, stuck.join("; "));
   check("all fixable findings resolved", after.total === 0, `${after.total} remaining`);
   check("score reaches 100 after full remediation", after.score === 100, `${after.score}`);
+
+  // The report must describe the remediated markup, with and without the applied-fix records.
+  for (const [label, appliedFixes] of [["with applied-fix records", records], ["without records", undefined]] as const) {
+    const r = buildReport({ projectName: "verify", generatedFor: sample.name, originalHtml: sample.html, fixedHtml: fixed, appliedFixes });
+    const stray = reportAfterLinesNotInHtml(r.markdown, fixed);
+    check(`report "After" lines match the remediated HTML (${label})`, stray.length === 0, stray.join(" | "));
+  }
 
   if (sample.id === "cafe") {
     const report = buildReport({
@@ -105,6 +139,24 @@ for (const sample of SAMPLES) {
       "report carries the not-a-certification statement",
       report.markdown.includes("not a certification"),
     );
+
+    // A reviewer rewrites the placeholder button label before approving it.
+    const PLACEHOLDER = "Describe this button's action";
+    const edited = applyAllFixes(sample.html, (f, drafted) =>
+      f.ruleId === "button-name" ? drafted.replace(PLACEHOLDER, "Order online") : drafted,
+    );
+    check("edited fix is in the corrected HTML", edited.html.includes('aria-label="Order online"') && !edited.html.includes(PLACEHOLDER));
+    check("edited run still reaches 100", auditHtml(edited.html).score === 100);
+    for (const [label, appliedFixes] of [["with applied-fix records", edited.records], ["without records", undefined]] as const) {
+      const r = buildReport({ projectName: "verify", generatedFor: sample.name, originalHtml: sample.html, fixedHtml: edited.html, appliedFixes });
+      check(`report never prints the unapplied placeholder as "After" (${label})`, !r.markdown.includes(`aria-label="${PLACEHOLDER}"`));
+      const stray = reportAfterLinesNotInHtml(r.markdown, edited.html);
+      check(`edited report "After" lines match the remediated HTML (${label})`, stray.length === 0, stray.join(" | "));
+      check(`edited report counts match (${label})`, r.fixedCount === audit.total && r.remainingCount === 0);
+    }
+    const withRecords = buildReport({ projectName: "verify", generatedFor: sample.name, originalHtml: sample.html, fixedHtml: edited.html, appliedFixes: edited.records });
+    check("report prints the reviewer's wording", withRecords.markdown.includes('aria-label="Order online"'));
+    check("report marks the fix as edited by the reviewer", withRecords.markdown.includes("wording edited by the reviewer before approval"));
   }
 }
 

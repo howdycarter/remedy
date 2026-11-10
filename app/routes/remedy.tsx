@@ -45,6 +45,15 @@ interface AuditResult {
   findings: Finding[];
 }
 
+interface AppliedFix {
+  ruleId: string;
+  selector: string;
+  snippet: string;
+  before: string;
+  after: string;
+  draftedAfter: string;
+}
+
 interface Report {
   markdown: string;
   fixedHtml: string;
@@ -88,6 +97,7 @@ export default function RemedyRoute() {
   const [audit, setAudit] = useState<AuditResult | null>(null);
   const [priorityMap, setPriorityMap] = useState<Record<string, { rank: number; rationale: string }>>({});
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [applied, setApplied] = useState<AppliedFix[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [report, setReport] = useState<Report | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -122,6 +132,7 @@ export default function RemedyRoute() {
     setPageLabel(label);
     setDismissed(new Set());
     setEdits({});
+    setApplied([]);
     setReport(null);
     setError(null);
     setBusy("audit");
@@ -185,6 +196,12 @@ export default function RemedyRoute() {
         expectedBefore: f.fix.before,
       })) as { html: string };
       setCurrentHtml(res.html);
+      // Record what was approved, edits included, so the report prints it rather than the draft.
+      const fix = f.fix;
+      setApplied((prev) => [
+        ...prev,
+        { ruleId: f.ruleId, selector: f.selector, snippet: f.snippet, before: fix.before, after, draftedAfter: fix.after },
+      ]);
       setReport(null);
       const result = await runAuditOn(res.html);
       setStatus(`Fix applied: ${f.title}. ${result.total} finding(s) remain, score ${result.score}/100.`);
@@ -205,6 +222,7 @@ export default function RemedyRoute() {
         pageLabel: pageLabel || "Page",
         originalHtml,
         fixedHtml: currentHtml,
+        appliedFixes: applied,
       })) as Report;
       setReport(res);
       setStatus(`Report generated — ${res.fixedCount} resolved, ${res.remainingCount} remaining.`);

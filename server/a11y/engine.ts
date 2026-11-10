@@ -856,11 +856,46 @@ export function prioritizeFindings(audit: AuditResult): {
 /* ACR/VPAT-style remediation report                                    */
 /* ------------------------------------------------------------------ */
 
+/**
+ * A fix as the reviewer actually approved it. The wording may differ
+ * from the engine's draft, so the report prints this rather than the
+ * draft whenever the caller supplies it.
+ */
+export interface AppliedFix {
+  ruleId: string;
+  selector: string;
+  snippet: string;
+  before: string;
+  after: string;
+  /** The draft shown at approval time; differs from `after` when the reviewer edited it. */
+  draftedAfter?: string | undefined;
+}
+
+/** Pair each resolved finding with the applied fix recorded for it, most specific match first. */
+function matchAppliedFixes(resolved: Finding[], applied: AppliedFix[]): Map<string, AppliedFix> {
+  const unused = [...applied];
+  const matched = new Map<string, AppliedFix>();
+  const passes: ((f: Finding, a: AppliedFix) => boolean)[] = [
+    (f, a) => a.snippet === f.snippet,
+    (f, a) => a.selector === f.selector,
+    (f, a) => !!f.fix && a.before === f.fix.before,
+  ];
+  for (const pass of passes) {
+    for (const f of resolved) {
+      if (matched.has(f.id)) continue;
+      const i = unused.findIndex((a) => a.ruleId === f.ruleId && pass(f, a));
+      if (i !== -1) matched.set(f.id, unused.splice(i, 1)[0]!);
+    }
+  }
+  return matched;
+}
+
 export function buildReport(opts: {
   projectName: string;
   generatedFor: string;
   originalHtml: string;
   fixedHtml: string;
+  appliedFixes?: AppliedFix[] | undefined;
 }): { markdown: string; beforeScore: number; afterScore: number; fixedCount: number; remainingCount: number } {
   const before = auditHtml(opts.originalHtml);
   const after = auditHtml(opts.fixedHtml);
@@ -939,15 +974,33 @@ export function buildReport(opts: {
   lines.push(`## Resolved findings`);
   lines.push("");
   if (resolved.length === 0) lines.push(`None.`);
+  // The report states what is in the remediated markup, not what was
+  // drafted: an "After" line is printed only for text the caller recorded
+  // as applied, or for a draft that is present verbatim in the fixed HTML.
+  const appliedByFinding = matchAppliedFixes(resolved, opts.appliedFixes ?? []);
+  const code = (s: string) => `\`${s.replace(/`/g, "'")}\``;
   for (const f of resolved) {
     lines.push(`### ${f.title} — ${f.wcag} (${f.severity})`);
     lines.push("");
     lines.push(`- **Location:** \`${f.selector}\``);
     lines.push(`- **Issue:** ${f.message}`);
-    if (f.fix) {
+    const applied = appliedByFinding.get(f.id);
+    if (applied) {
+      const edited = applied.draftedAfter !== undefined && applied.draftedAfter !== applied.after;
+      const stillPresent = opts.fixedHtml.includes(applied.after);
+      if (f.fix) lines.push(`- **Remediation:** ${f.fix.description}`);
+      lines.push(`- **Before:** ${code(applied.before)}`);
+      lines.push(
+        `- **After${edited ? " (wording edited by the reviewer before approval)" : ""}:** ${code(applied.after)}` +
+          (stillPresent ? "" : ` — later changed again by another approved fix`),
+      );
+    } else if (f.fix && opts.fixedHtml.includes(f.fix.after)) {
       lines.push(`- **Remediation:** ${f.fix.description}`);
-      lines.push(`- **Before:** \`${f.fix.before.replace(/`/g, "'")}\``);
-      lines.push(`- **After:** \`${f.fix.after.replace(/`/g, "'")}\``);
+      lines.push(`- **Before:** ${code(f.fix.before)}`);
+      lines.push(`- **After:** ${code(f.fix.after)}`);
+    } else {
+      if (f.fix) lines.push(`- **Drafted fix (not applied as written):** ${f.fix.description}`);
+      lines.push(`- **Resolution:** The finding no longer occurs in the remediated markup.`);
     }
     lines.push("");
   }

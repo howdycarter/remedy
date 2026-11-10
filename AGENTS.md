@@ -75,6 +75,10 @@ One job, end to end: **ingest → audit → prioritize → approve → export.**
   limitation statement.
 - After every `apply-fix`, re-run `run-audit` on the new HTML before
   reporting state — spans from the old audit are stale.
+- When calling `export-report`, pass `appliedFixes` with each fix as it
+  was approved (the `after` text sent to `apply-fix`, plus the draft as
+  `draftedAfter`). The report prints the approved wording, never an
+  unapplied draft.
 - Prefer the seeded samples for demonstrations. If a live fetch fails,
   say so and fall back to a sample; do not retry blindly.
 
